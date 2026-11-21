@@ -172,7 +172,7 @@ class TestTheorem4_1FrechetExpansion:
         assert np.linalg.norm(D1, ord=2) < 1e-9
 
         # Mixed second Fréchet derivative D^2 Omega_G(I)[H, K] = -(HK + KH)
-        e = 1e-3
+        e = 1e-4
         D2_num = (
             og.omega_g_matrix(I + e * H + e * K)
             - og.omega_g_matrix(I + e * H - e * K)
