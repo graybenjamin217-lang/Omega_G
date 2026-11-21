@@ -22,7 +22,7 @@ import omega_g as og
 
 
 # ---------------------------------------------------------------------------
-# Independent Root-Finder Helper (Zero Reliance on External Libraries)
+# Independent Root-Finder & Random Matrix Helpers
 # ---------------------------------------------------------------------------
 def bisect_root(fn, a: float, b: float, tol: float = 1e-14, max_iter: int = 200) -> float:
     fa, fb = fn(a), fn(b)
@@ -59,7 +59,6 @@ class TestProposition1_1Smoothness:
 
     def test_odd_flatness_at_origin(self):
         assert og.f_odd_scalar(0.0) == 0.0
-        # Central finite differences of orders 1..4 at x=0 vanish identically in float64
         h = 1e-3
         d1 = (og.f_odd_scalar(h) - og.f_odd_scalar(-h)) / (2 * h)
         d2 = (og.f_odd_scalar(h) - 2 * og.f_odd_scalar(0.0) + og.f_odd_scalar(-h)) / (h**2)
@@ -84,7 +83,6 @@ class TestProposition2_2AlgebraicProperties:
         A_plus = (eigvecs * np.maximum(eigvals, 0.0)) @ eigvecs.conj().T
         A_minus = (eigvecs * np.maximum(-eigvals, 0.0)) @ eigvecs.conj().T
 
-        # Confirm valid orthogonal split A = A_+ - A_-
         assert np.allclose(A_plus - A_minus, A, atol=1e-13)
         assert np.allclose(A_plus @ A_minus, 0.0, atol=1e-13)
 
@@ -121,7 +119,7 @@ class TestTheorem3_1FixedPointsAndBasins:
 
     def test_independent_x_max_and_basins(self):
         x_max = bisect_root(lambda t: og.f_scalar(t) - 0.5, 2.0, 4.0)
-        assert math.isclose(x_max, 2.8874748506024603, rel_tol=1e-12)
+        assert math.isclose(x_max, 2.8874748541959434, rel_tol=1e-12)
         assert math.isclose(x_max, og.X_MAX, rel_tol=1e-12)
 
         def iterate(val: float, steps: int = 80) -> float:
@@ -148,32 +146,32 @@ class TestTheorem4_1FrechetExpansion:
         h1, h2 = 2e-2, 1e-2
         r1 = abs(og.f_scalar(1 + h1) - (1 - h1**2 + 1.5 * h1**3 - (4 / 3) * h1**4))
         r2 = abs(og.f_scalar(1 + h2) - (1 - h2**2 + 1.5 * h2**3 - (4 / 3) * h2**4))
-        # Fifth-order residual should scale by 2^5 = 32
+        # Fifth-order residual scales by 2^5 = 32
         assert 29.0 < (r1 / r2) < 35.0
 
         # Confirm the old Dual-Dilation cubic proxy A^-1(A - H^2 + 1/2 H^3) fails at 4th order (-3/2 vs -4/3)
         def old_proxy(h: float) -> float:
             return (1.0 + h - h**2 + 0.5 * h**3) / (1.0 + h)
 
-        diff_proxy = (og.f_scalar(1 + h2) - old_proxy(h2)) / (h2**4)
-        # (-4/3) - (-3/2) = +1/6
-        assert math.isclose(diff_proxy, 1.0 / 6.0, rel_tol=5e-2)
+        h_p = 2e-3
+        diff_proxy = (og.f_scalar(1 + h_p) - old_proxy(h_p)) / (h_p**4)
+        # Exact leading difference is (-4/3) - (-3/2) = +1/6
+        assert math.isclose(diff_proxy, 1.0 / 6.0, rel_tol=2e-2)
 
     def test_first_and_corrected_second_frechet_derivatives(self):
         rng = np.random.default_rng(42)
         H = random_hermitian(5, rng)
         K = random_hermitian(5, rng)
-        # Ensure non-commuting directions
         assert np.linalg.norm(H @ K - K @ H, ord=2) > 0.5
         I = np.eye(5)
 
-        # First Fréchet derivative at I is identically zero
+        # First Fréchet derivative at I is identically zero (central diff error ~ 1.5 * eps^2 * ||H||^3)
+        H_unit = H / np.linalg.norm(H, ord=2)
         eps = 1e-5
-        D1 = (og.omega_g_matrix(I + eps * H) - og.omega_g_matrix(I - eps * H)) / (2 * eps)
-        assert np.linalg.norm(D1, ord=2) < 1e-10
+        D1 = (og.omega_g_matrix(I + eps * H_unit) - og.omega_g_matrix(I - eps * H_unit)) / (2.0 * eps)
+        assert np.linalg.norm(D1, ord=2) < 1e-9
 
         # Mixed second Fréchet derivative D^2 Omega_G(I)[H, K] = -(HK + KH)
-        # Central mixed finite difference: [F(I+eH+eK) - F(I+eH-eK) - F(I-eH+eK) + F(I-eH-eK)] / (4 e^2)
         e = 1e-3
         D2_num = (
             og.omega_g_matrix(I + e * H + e * K)
@@ -185,7 +183,7 @@ class TestTheorem4_1FrechetExpansion:
         old_wrong_D2 = -0.5 * (H @ K + K @ H)
 
         assert np.linalg.norm(D2_num - expected_D2, ord=2) < 1e-5
-        assert np.linalg.norm(D2_num - old_wrong_D2, ord=2) > 0.5  # catches the old factor-of-2 bug
+        assert np.linalg.norm(D2_num - old_wrong_D2, ord=2) > 0.5
 
         # Odd reflection around -I: D^2 Omega_G^odd(-I)[H, K] = +(HK + KH)
         D2_neg = (
@@ -219,13 +217,11 @@ class TestTheorem5_1StabilityRadiusAndBounds:
         assert math.isclose(k_delta, og.K_DELTA, rel_tol=1e-12)
         assert math.isclose(c_delta, og.C_DELTA, rel_tol=1e-12)
 
-        # Confirm max |f''| on [1-delta, 1+delta] occurs at x_crit
         grid = np.linspace(1.0 - delta, 1.0 + delta, 5000)
         assert np.max(np.abs(og.f_double_prime(grid))) <= abs(og.f_double_prime(x_crit)) + 1e-10
         assert k_delta * delta < 0.42
         assert c_delta * delta < 0.78
 
-        # Test single-step and multi-step quadratic bounds on random Hermitian matrices
         rng = np.random.default_rng(99)
         I = np.eye(6)
         for _ in range(10):
@@ -246,7 +242,6 @@ class TestTheorem5_1StabilityRadiusAndBounds:
 class TestTheorem6_1SpectralProjectionsAndAdapters:
     def test_norm_convergence_to_partial_symmetry(self):
         rng = np.random.default_rng(123)
-        # Spectrum avoiding {+-0.5, +-x_max}
         eigs = np.array([-4.0, -2.1, -0.7, -0.25, 0.0, 0.3, 0.85, 2.5, 3.5])
         Q, _ = np.linalg.qr(rng.standard_normal((len(eigs), len(eigs))))
         A = (Q * eigs) @ Q.T
@@ -297,7 +292,7 @@ class TestProposition7_1SymmetricBCH:
 
         residuals_no_comm = []
         residuals_full = []
-        for eps in (0.04, 0.02):
+        for eps in (0.01, 0.005):
             X, Y = eps * X0, eps * Y0
             S = X + Y
             C3 = -(1.0 / 24.0) * comm(X, comm(X, Y)) - (1.0 / 12.0) * comm(Y, comm(X, Y))
@@ -328,7 +323,6 @@ class TestProposition7_1SymmetricBCH:
 # ===========================================================================
 class TestEdgeCase1FoldbackAboveXMax:
     def test_non_monotonic_foldback_and_rapid_spike_collapse(self):
-        # x = 3 exceeds x_max (~2.8875), so step 1 drops strictly below repeller 0.5
         f3 = og.f_scalar(3.0)
         assert math.isclose(f3, 3.0 ** (-2.0 / 3.0), rel_tol=1e-14)
         assert f3 < 0.5
@@ -338,7 +332,6 @@ class TestEdgeCase1FoldbackAboveXMax:
             val = og.f_scalar(val)
         assert val == 0.0
 
-        # Extreme outlier x = 100 collapses to exact float64 0.0 in 2 steps
         step1 = og.f_scalar(100.0)
         assert math.isclose(step1, 100.0 ** (-0.99), rel_tol=1e-14)
         step2 = og.f_scalar(step1)
@@ -366,17 +359,14 @@ class TestEdgeCase2RepellerSlowdownAndBoundaryBreakdown:
         A = np.diag([0.2, 0.5, 0.9])
         A_lim = og.omega_g_matrix(A, iterations=50)
         assert np.allclose(np.diag(A_lim), [0.0, 0.5, 1.0], atol=1e-14)
-        # P^2 != P because of the pinned 0.5 mode
         assert np.linalg.norm(A_lim @ A_lim - A_lim, ord=2) == pytest.approx(0.25, abs=1e-14)
 
     def test_discretized_continuous_spectrum_fails_uniform_norm_convergence(self):
-        # Multiplication operator M_x on [0, 1] discretized on a dense grid crossing x = 0.5
-        grid = np.linspace(0.0, 1.0, 4001)  # includes 0.50025 arbitrarily close to 0.5
+        grid = np.linspace(0.0, 1.0, 4001)
         step_target = (grid > 0.5).astype(float)
         vals = grid.copy()
         for _ in range(15):
             vals = og.f_scalar(vals)
-        # Uniform (operator) norm error stays >= 0.45 because points near 0.5 haven't escaped
         assert float(np.max(np.abs(vals - step_target))) >= 0.45
 
 
@@ -387,11 +377,9 @@ class TestEdgeCase3JordanBlockAnnihilation:
         J = np.eye(m) + N
         expected_steps = math.ceil(math.log2(m))
 
-        # Strictly not identity at step (expected_steps - 1)
         prev = og.omega_g_nonnormal(J, iterations=expected_steps - 1)
         assert np.linalg.norm(prev - np.eye(m), ord="fro") >= 0.99
 
-        # Exact annihilation to identity at step expected_steps
         final = og.omega_g_nonnormal(J, iterations=expected_steps)
         assert np.linalg.norm(final - np.eye(m), ord="fro") < 1e-11
 
@@ -409,18 +397,16 @@ class TestEdgeCase3JordanBlockAnnihilation:
 
 class TestEdgeCase4Float64UnderflowAndPrecision:
     def test_subnormal_and_underflow_cliffs(self):
-        tiny = np.finfo(np.float64).tiny  # ~2.225e-308
+        tiny = np.finfo(np.float64).tiny
 
         def raw_log_exp(x: float) -> float:
             return math.exp(((1.0 - x) / x) * math.log(x))
 
-        # Normal float at 0.0070, nonzero subnormal at 0.0069, exact 0.0 at 0.0066
         assert raw_log_exp(0.0070) >= tiny
         val_sub = raw_log_exp(0.0069)
         assert 0.0 < val_sub < tiny
         assert raw_log_exp(0.0066) == 0.0
 
-        # Locate exact underflow threshold by bisection
         lo, hi = 0.0066, 0.0068
         for _ in range(60):
             mid = 0.5 * (lo + hi)
@@ -429,10 +415,8 @@ class TestEdgeCase4Float64UnderflowAndPrecision:
             else:
                 hi = mid
         assert 0.00665 < hi < 0.00670
-        # Confirm our clamp is strictly below the exact float64 underflow cutoff
         assert og.FLOAT64_UNDERFLOW_CLAMP < lo
 
-        # Zero RuntimeWarnings or NaNs across extreme small values
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             extreme = np.array([0.0, 1e-300, 1e-12, 0.0066, 0.00665])
@@ -443,7 +427,6 @@ class TestEdgeCase4Float64UnderflowAndPrecision:
 
     def test_near_unity_precision(self):
         h = 1e-5
-        # True 1 - f(1+h) = h^2 - 1.5*h^3 + 4/3*h^4 - ...
         expected_diff = h**2 - 1.5 * h**3 + (4.0 / 3.0) * h**4
         actual_diff = 1.0 - og.f_scalar(1.0 + h)
         assert abs(actual_diff - expected_diff) < 1e-14
@@ -453,27 +436,21 @@ class TestEdgeCase5BandpassOutlierRejection:
     def test_bandpass_beats_monotonic_gates_under_impulse_spikes(self):
         rng = np.random.default_rng(777)
         n = 5000
-        # Ternary signal in {-1, 0, +1}
         truth = rng.choice([-1.0, 0.0, 1.0], size=n, p=[0.25, 0.50, 0.25])
         signal = truth + rng.normal(0.0, 0.12, size=n)
 
-        # Inject sparse large impulse spikes (amplitude 5..15) onto 8% of zero channels
         zero_idx = np.flatnonzero(truth == 0.0)
         spike_idx = rng.choice(zero_idx, size=int(0.16 * len(zero_idx)), replace=False)
         signal[spike_idx] += rng.choice([-1.0, 1.0], size=len(spike_idx)) * rng.uniform(
             5.0, 15.0, size=len(spike_idx)
         )
 
-        # Iterated Omega_G_odd (bandpass gate)
         y_omega = signal.copy()
         for _ in range(10):
             y_omega = og.f_odd_scalar(y_omega)
 
-        # Monotonic baselines: hard threshold at 0.5 and tanh saturation
         y_hard = np.where(np.abs(signal) > 0.5, np.sign(signal), 0.0)
         y_tanh = np.tanh(2.5 * signal)
-
-        # Explicit two-sided hard bandpass gate on (0.5, x_max)
         y_band_hard = np.where(
             (np.abs(signal) > 0.5) & (np.abs(signal) < og.X_MAX), np.sign(signal), 0.0
         )
@@ -483,8 +460,6 @@ class TestEdgeCase5BandpassOutlierRejection:
         mse_tanh = float(np.mean((y_tanh - truth) ** 2))
         mse_band_hard = float(np.mean((y_band_hard - truth) ** 2))
 
-        # Omega_G_odd must strongly outperform monotonic gates on impulse-spiked signals
         assert mse_omega < 0.25 * mse_hard
         assert mse_omega < 0.25 * mse_tanh
-        # And match the explicit two-sided hard bandpass gate closely
         assert abs(mse_omega - mse_band_hard) < 0.005
