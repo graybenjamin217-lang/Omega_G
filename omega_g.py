@@ -3,7 +3,8 @@ Variable-Exponent Feedback Operator (Omega_G) and Its Odd Extension (Omega_G_odd
 
 Implements:
 - Scalar generators f(x) = x^(1/x - 1) on [0, inf) and smooth odd extension f_odd on R
-- Continuous functional calculus on Hermitian/symmetric matrices (via eigendecomposition)
+- Exact first and second scalar derivatives
+- Continuous functional calculus on Hermitian/symmetric matrices (eigendecomposition)
 - Bounded spectral adapters for unbounded self-adjoint operators (Remark 6.2)
 - Pure-NumPy holomorphic extension for non-normal matrices with positive real spectra
 """
@@ -15,15 +16,13 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 # ---------------------------------------------------------------------------
-# Analytical & High-Precision Constants (Revised Paper, Sections 3-5)
+# Analytical & Full-Precision float64 Constants (Sections 3-5)
 # ---------------------------------------------------------------------------
 X_REPELLER: float = 0.5
 REPELLER_MULTIPLIER: float = 1.0 + 2.0 * math.log(2.0)  # 2.3862943611198906
-X_MAX: float = 2.8874748506024603                       # unique root of f(x) = 1/2 in (1, inf)
-X_CRIT: float = 0.7258278399205121                      # unique root of f'(x) = 1 in (1/2, 1)
-DELTA: float = 1.0 - X_CRIT                             # 0.2741721600794879
-K_DELTA: float = 1.5166111641122025                     # sharp quadratic constant (1 - f(x_crit)) / delta^2
-C_DELTA: float = 2.8127942467387324                     # Lagrange constant 0.5 * |f''(x_crit)|
+X_MAX: float = 2.8874748541959434                       # unique root of f(x) = 1/2 in (1, inf)
+X_CRIT: float = 0.7258278400933647                      # unique root of f'(x) = 1 in (1/2, 1)
+DELTA: float = 1.0 - X_CRIT                             # 0.2741721599066353
 
 # Strictly below the exact IEEE-754 float64 underflow cutoff (~0.006677):
 # avoids subnormal traps and 0*inf warnings with zero precision loss in float64.
@@ -67,9 +66,7 @@ def f_scalar(x: ArrayLike, *, check_domain: bool = True) -> NDArray[np.float64] 
 
 
 def f_odd_scalar(x: ArrayLike) -> NDArray[np.float64] | float:
-    """
-    Evaluate the C^inf odd reflection f_odd(x) = sign(x) * f(|x|) on R.
-    """
+    """Evaluate the C^inf odd reflection f_odd(x) = sign(x) * f(|x|) on R."""
     is_scalar = np.ndim(x) == 0
     arr = np.asarray(x, dtype=np.float64)
     mag = f_scalar(np.abs(arr), check_domain=False)
@@ -131,6 +128,11 @@ def f_double_prime(x: ArrayLike) -> NDArray[np.float64] | float:
         out[active] = fx * (u * u + u_prime)
 
     return float(out) if is_scalar else out
+
+
+# Derived quadratic error bounds (computed directly so they never drift from X_CRIT)
+K_DELTA: float = (1.0 - float(f_scalar(X_CRIT))) / (DELTA**2)   # ~1.516611
+C_DELTA: float = 0.5 * abs(float(f_double_prime(X_CRIT)))       # ~2.812794
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +232,7 @@ def bounded_odd_transform(D: NDArray[np.floating | np.complexfloating], tau: flo
 # Pure-NumPy Holomorphic Extension for Non-Normal Matrices (Edge Case 3)
 # ---------------------------------------------------------------------------
 def expm_numpy(Z: NDArray[np.floating | np.complexfloating]) -> NDArray:
-    """Matrix exponential via scaling-and-squaring with a 20-term Taylor series."""
+    """Matrix exponential via scaling-and-squaring with a Taylor series."""
     Z_arr = np.asarray(Z, dtype=np.complex128 if np.iscomplexobj(Z) else np.float64)
     n = Z_arr.shape[0]
     norm = float(np.linalg.norm(Z_arr, ord=1))
@@ -251,7 +253,7 @@ def expm_numpy(Z: NDArray[np.floating | np.complexfloating]) -> NDArray:
 
 
 def _sqrtm_denman_beavers(A: NDArray, max_iter: int = 60, tol: float = 1e-14) -> NDArray:
-    """Principal matrix square root via Denman-Beavers iteration (no non-positive real eigenvalues)."""
+    """Principal matrix square root via Denman-Beavers iteration."""
     n = A.shape[0]
     Y = A.astype(np.complex128 if np.iscomplexobj(A) else np.float64, copy=True)
     Z = np.eye(n, dtype=Y.dtype)
@@ -267,7 +269,7 @@ def _sqrtm_denman_beavers(A: NDArray, max_iter: int = 60, tol: float = 1e-14) ->
 def logm_pos_spectrum(A: NDArray, max_sqrts: int = 20) -> NDArray:
     """
     Principal matrix logarithm via inverse scaling-and-squaring + Mercator series.
-    Works on non-normal matrices (including Jordan blocks) whose eigenvalues have positive real parts.
+    Works on non-normal matrices (including Jordan blocks) whose eigenvalues have Re(z) > 0.
     """
     n = A.shape[0]
     dtype = np.complex128 if np.iscomplexobj(A) else np.float64
