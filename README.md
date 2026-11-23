@@ -19,7 +19,17 @@ Omega_G/
 ├── CITATION.cff            # Machine-readable citation metadata
 └── LICENSE                 # Software license
 ```
+## Quickstart
 
+```bash
+pip install -r requirements.txt
+pytest -v
+python benchmark_bandpass.py
+```
+
+## Test Results
+
+```text
 ============================= test session starts ==============================
 platform linux -- Python 3.14.2, pytest-9.2.0, pluggy-1.7.0
 rootdir: /workspaces/Omega_G
