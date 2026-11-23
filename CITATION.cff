@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this code or verify results from this repository, please cite the accompanying preprint."
+type: software
+title: "Omega_G: Verification Suite for the Variable-Exponent Feedback Operator on Unital C*-Algebras"
+version: 1.0.0
+date-released: 2026-11-22
+authors:
+  - family-names: "Gray"
+    given-names: "Benjamin Edward"
+    orcid: "[https://orcid.org/0009-0005-8190-2624](https://orcid.org/0009-0005-8190-2624)"
+repository-code: "[https://github.com/graybenjamin217-lang/Omega_G](https://github.com/graybenjamin217-lang/Omega_G)"
+preferred-citation:
+  type: article
+  title: "The Variable-Exponent Feedback Operator Ω̂_G and Its Odd Extension on Unital C*-Algebras"
+  authors:
+    - family-names: "Gray"
+      given-names: "Benjamin Edward"
+      orcid: "[https://orcid.org/0009-0005-8190-2624](https://orcid.org/0009-0005-8190-2624)"
+  doi: "10.5281/zenodo.24445638"
+  year: 2026
+  publisher:
+    name: "Zenodo"
