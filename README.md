@@ -1,13 +1,25 @@
-# Omega_G
+# $\hat{\Omega}_G$ — Variable-Exponent Feedback Operator Suite
 
-omega-g/
-├── omega_g.py              # Core scalar, Hermitian C*-algebra, and non-normal implementations
-├── test_omega_g.py         # Strict pytest suite verifying all theorems + all 5 edge cases
-└── benchmark_bandpass.py   # Honest head-to-head bandpass outlier-rejection benchmark
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24445638.svg)](https://doi.org/10.5281/zenodo.24445638)
 
-## Test Results
+Reference implementation, numerical theorem verification suite, and outlier-rejection benchmark accompanying:
+
+> **The Variable-Exponent Feedback Operator $\hat{\Omega}_G$ and Its Odd Extension on Unital $C^*$-Algebras**  
+> Benjamin Edward Gray (2026)  
+> Version 1 DOI: [10.5281/zenodo.24445638](https://doi.org/10.5281/zenodo.24445638) · Concept DOI: [10.5281/zenodo.24445637](https://doi.org/10.5281/zenodo.24445637)
+
+## Repository Structure
 
 ```text
+Omega_G/
+├── omega_g.py              # Core scalar, Hermitian C*-algebra, and non-normal implementations
+├── test_omega_g.py         # Strict pytest suite verifying all theorems + all 5 edge cases
+├── benchmark_bandpass.py   # Honest head-to-head bandpass outlier-rejection benchmark
+├── requirements.txt        # Python dependencies
+├── CITATION.cff            # Machine-readable citation metadata
+└── LICENSE                 # Software license
+```
+
 ============================= test session starts ==============================
 platform linux -- Python 3.14.2, pytest-9.2.0, pluggy-1.7.0
 rootdir: /workspaces/Omega_G
